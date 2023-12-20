@@ -253,6 +253,121 @@ char	**cmd1;
 	return (i);
 }
 
+
+int	piperino8(t_words **INstruct, int i)
+{
+    char	**cmd1;
+    char	*path1;
+    int		**pipe_fd;
+    pid_t	pids[100];
+	int		j;
+
+    j = i;
+    pipe_fd = malloc(200 * sizeof(int *));
+    while (is_pipe(INstruct, j))
+    {
+        pipe_fd[j] = malloc(2 * sizeof(int));
+        if (pipe(pipe_fd[j]) == -1)
+            error_exit("(piperino6) Pipe creation failed\n");
+        j++;
+    }
+    // i = 0;
+
+    while (INstruct[i] != NULL)
+    {
+        cmd1 = ft_split(INstruct[i]->word_clean, ' ');
+        path1 = ft_strjoin("/bin/", cmd1[0]);
+        pids[i] = fork();
+        if (pids[i] == 0)
+        {
+            if (i != 0)
+            {
+                dup2(pipe_fd[i - 1][0], STDIN_FILENO);
+                close(pipe_fd[i - 1][0]);
+                close(pipe_fd[i - 1][1]);
+            }
+            if (is_pipe(INstruct, i))
+            {
+                dup2(pipe_fd[i][1], STDOUT_FILENO);
+                close(pipe_fd[i][0]);
+                close(pipe_fd[i][1]);
+            }
+            execve(path1, cmd1, NULL);
+            perror("(piperino6) Exec1 failed");
+        }
+        else
+        {
+            if (i != 0)
+            {
+                close(pipe_fd[i - 1][0]);
+                close(pipe_fd[i - 1][1]);
+            }
+        }
+        free_piperino2(INstruct[i], cmd1, path1);
+        i++;
+    }
+
+    // Close the write ends of the pipes in the parent process after all child processes have been forked
+    for (int j = 0; j < i; j++)
+    {
+        if (is_pipe(INstruct, j))
+        {
+            close(pipe_fd[j][1]);
+        }
+    }
+
+    // Wait for all child processes to finish
+    for (int j = 0; j < i; j++)
+    {
+        waitpid(pids[j], NULL, 0);
+    }
+
+    return (i);
+}
+/*
+Executor
+{
+    while (words)
+    {
+        if (is_redirection)
+        {
+            do(redirection function on all following words)
+        }
+        if (is_pipe)
+        {
+            do(pipes)
+            in pipes
+            {
+                -cnt pipes
+                -initialize pipes
+                -do the forking for each child
+                -if its the last word in the pipeproces:
+                    -if (is_redirection)
+            }
+        }
+    }
+}
+*/
+int Executor2(t_data *data)
+{
+	int	i = 0;
+
+	while (i < data->INstruct[0]->num_of_elements)
+	{
+		// if (is_redirection)
+		// {
+				// i += redirectionprog(INstruct, i)
+		// }
+		if (is_pipe(data->INstruct, i))
+		{
+			i += piperino8(data->INstruct, i);
+		}
+		else
+			printf("------single command\n");
+		i++;
+	}
+	return (i);
+}
 int	piperino6(t_words **INstruct)
 {
     char	**cmd1;
@@ -375,7 +490,7 @@ int piperino5(t_words **INstruct)
 	return (i);
 }
 
-void	routine(t_data	*data)
+void	routine(t_data *data)
 {
 	int	i;
 	// printf("elements:%d\n", INstruct[0]->num_of_elements);
@@ -385,8 +500,8 @@ void	routine(t_data	*data)
 		if (data->INstruct[i]->token_after_word != NULL && \
 				data->INstruct[i]->token_after_word[0] == '|')
 			i += piperino6(&data->INstruct[i]);
-		else
-			parser(data,i);
+		// else
+		// 	parser(data,i);
 		i++;
 	}
 }
